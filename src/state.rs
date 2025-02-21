@@ -1,0 +1,20 @@
+use cosmwasm_schema::cw_serde;
+use cosmwasm_std::Addr;
+use cw_storage_plus::{Item, Map};
+use schemars::JsonSchema;
+use serde::{Deserialize, Serialize};
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, JsonSchema)]
+pub struct State {
+    pub owner: Addr,
+    pub retry_delay: u64,
+}
+
+#[cw_serde]
+pub struct ChainSetting {
+    pub compass_job_id: String,
+    pub main_job_id: String,
+}
+
+pub const CHAIN_SETTINGS: Map<String, ChainSetting> = Map::new("chain_settings");
+pub const STATE: Item<State> = Item::new("state");

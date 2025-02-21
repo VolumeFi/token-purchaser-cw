@@ -1,0 +1,570 @@
+use std::collections::BTreeMap;
+
+#[cfg(not(feature = "library"))]
+use cosmwasm_std::entry_point;
+use cosmwasm_std::{
+    to_json_binary, Binary, CosmosMsg, Deps, DepsMut, Env, MessageInfo, Response, StdResult,
+    WasmMsg,
+};
+use ethabi::{Address, Contract, Function, Param, ParamType, StateMutability, Token, Uint};
+use std::str::FromStr;
+
+use crate::error::ContractError;
+use crate::msg::{DexExecuteMsg, ExecuteJob, ExecuteMsg, InstantiateMsg, PalomaMsg, QueryMsg};
+use crate::state::{ChainSetting, State, CHAIN_SETTINGS, STATE};
+
+/*
+// version info for migration info
+const CONTRACT_NAME: &str = "crates.io:token-purchaser-cw";
+const CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");
+*/
+
+#[cfg_attr(not(feature = "library"), entry_point)]
+pub fn instantiate(
+    deps: DepsMut,
+    _env: Env,
+    _info: MessageInfo,
+    msg: InstantiateMsg,
+) -> Result<Response, ContractError> {
+    let state = State {
+        owner: deps.api.addr_validate(&msg.owner)?,
+        retry_delay: msg.retry_delay,
+    };
+    STATE.save(deps.storage, &state)?;
+    Ok(Response::new().add_attribute("action", "instantiate"))
+}
+
+#[cfg_attr(not(feature = "library"), entry_point)]
+pub fn execute(
+    deps: DepsMut,
+    _env: Env,
+    info: MessageInfo,
+    msg: ExecuteMsg,
+) -> Result<Response<PalomaMsg>, ContractError> {
+    match msg {
+        ExecuteMsg::DeployPalomaERC20 {
+            chain_id,
+            paloma_denom,
+            name,
+            symbol,
+            decimals,
+            blueprint,
+        } => {
+            let state = STATE.load(deps.storage)?;
+            assert!(state.owner == info.sender, "Unauthorized");
+            #[allow(deprecated)]
+            let contract: Contract = Contract {
+                constructor: None,
+                functions: BTreeMap::from_iter(vec![(
+                    "deploy_erc20".to_string(),
+                    vec![Function {
+                        name: "deploy_erc20".to_string(),
+                        inputs: vec![
+                            Param {
+                                name: "_paloma_denom".to_string(),
+                                kind: ParamType::String,
+                                internal_type: None,
+                            },
+                            Param {
+                                name: "_name".to_string(),
+                                kind: ParamType::String,
+                                internal_type: None,
+                            },
+                            Param {
+                                name: "_symbol".to_string(),
+                                kind: ParamType::String,
+                                internal_type: None,
+                            },
+                            Param {
+                                name: "_decimals".to_string(),
+                                kind: ParamType::Uint(8),
+                                internal_type: None,
+                            },
+                            Param {
+                                name: "_blueprint".to_string(),
+                                kind: ParamType::Address,
+                                internal_type: None,
+                            },
+                        ],
+                        outputs: Vec::new(),
+                        constant: None,
+                        state_mutability: StateMutability::NonPayable,
+                    }],
+                )]),
+                events: BTreeMap::new(),
+                errors: BTreeMap::new(),
+                receive: false,
+                fallback: false,
+            };
+            let tokens = &[
+                Token::String(paloma_denom),
+                Token::String(name),
+                Token::String(symbol),
+                Token::Uint(Uint::from_big_endian(&[decimals])),
+                Token::Address(Address::from_str(blueprint.as_str()).unwrap()),
+            ];
+
+            Ok(Response::new()
+                .add_message(CosmosMsg::Custom(PalomaMsg::SchedulerMsg {
+                    execute_job: ExecuteJob {
+                        job_id: CHAIN_SETTINGS
+                            .load(deps.storage, chain_id.clone())?
+                            .compass_job_id,
+                        payload: Binary::new(
+                            contract
+                                .function("deploy_erc20")
+                                .unwrap()
+                                .encode_input(tokens.as_slice())
+                                .unwrap(),
+                        ),
+                    },
+                }))
+                .add_attribute("action", "deploy_paloma_erc20"))
+        }
+        ExecuteMsg::SetBridge {
+            chain_id,
+            erc20,
+            denom,
+        } => {
+            let state = STATE.load(deps.storage)?;
+            assert!(state.owner == info.sender, "Unauthorized");
+            Ok(Response::new()
+                .add_message(CosmosMsg::Custom(PalomaMsg::SetErc20ToDenom {
+                    erc20_address: erc20,
+                    token_denom: denom,
+                    chain_reference_id: chain_id,
+                }))
+                .add_attribute("action", "set_bridge"))
+        }
+        ExecuteMsg::Exchange {
+            dex_router,
+            operations,
+            minimum_receive,
+            to,
+            max_spread,
+        } => {
+            let state = STATE.load(deps.storage)?;
+            assert!(state.owner == info.sender, "Unauthorized");
+            Ok(Response::new()
+                .add_message(CosmosMsg::Wasm(WasmMsg::Execute {
+                    contract_addr: dex_router.to_string(),
+                    msg: to_json_binary(&DexExecuteMsg::ExecuteSwapOperations {
+                        operations,
+                        minimum_receive,
+                        to,
+                        max_spread,
+                    })?,
+                    funds: info.funds,
+                }))
+                .add_attribute("action", "exchange"))
+        }
+        ExecuteMsg::SendToEvm {
+            recipient,
+            amount,
+            chain_reference_id,
+        } => {
+            let state = STATE.load(deps.storage)?;
+            assert!(state.owner == info.sender, "Unauthorized");
+            Ok(Response::new()
+                .add_message(CosmosMsg::Custom(PalomaMsg::SendTx {
+                    remote_chain_destination_address: recipient,
+                    amount,
+                    chain_reference_id,
+                }))
+                .add_attribute("action", "send_to_evm"))
+        }
+        ExecuteMsg::SendToken {
+            chain_id,
+            token,
+            to,
+            amount,
+        } => {
+            let state = STATE.load(deps.storage)?;
+            assert!(state.owner == info.sender, "Unauthorized");
+            #[allow(deprecated)]
+            let contract: Contract = Contract {
+                constructor: None,
+                functions: BTreeMap::from_iter(vec![(
+                    "send_token".to_string(),
+                    vec![Function {
+                        name: "send_token".to_string(),
+                        inputs: vec![
+                            Param {
+                                name: "token".to_string(),
+                                kind: ParamType::Address,
+                                internal_type: None,
+                            },
+                            Param {
+                                name: "to".to_string(),
+                                kind: ParamType::Address,
+                                internal_type: None,
+                            },
+                            Param {
+                                name: "amount".to_string(),
+                                kind: ParamType::Uint(256),
+                                internal_type: None,
+                            },
+                        ],
+                        outputs: Vec::new(),
+                        constant: None,
+                        state_mutability: StateMutability::NonPayable,
+                    }],
+                )]),
+                events: BTreeMap::new(),
+                errors: BTreeMap::new(),
+                receive: false,
+                fallback: false,
+            };
+            let tokens = &[
+                Token::Address(Address::from_str(token.as_str()).unwrap()),
+                Token::Address(Address::from_str(to.as_str()).unwrap()),
+                Token::Uint(Uint::from_big_endian(&amount.to_be_bytes())),
+            ];
+
+            Ok(Response::new()
+                .add_message(CosmosMsg::Custom(PalomaMsg::SchedulerMsg {
+                    execute_job: ExecuteJob {
+                        job_id: CHAIN_SETTINGS
+                            .load(deps.storage, chain_id.clone())?
+                            .main_job_id,
+                        payload: Binary::new(
+                            contract
+                                .function("send_token")
+                                .unwrap()
+                                .encode_input(tokens.as_slice())
+                                .unwrap(),
+                        ),
+                    },
+                }))
+                .add_attribute("action", "send_token"))
+        }
+        ExecuteMsg::SetChainSetting {
+            chain_id,
+            compass_job_id,
+            main_job_id,
+        } => {
+            let state = STATE.load(deps.storage)?;
+            assert!(state.owner == info.sender, "Unauthorized");
+            CHAIN_SETTINGS.save(
+                deps.storage,
+                chain_id.clone(),
+                &ChainSetting {
+                    compass_job_id: compass_job_id.clone(),
+                    main_job_id: main_job_id.clone(),
+                },
+            )?;
+
+            Ok(Response::new().add_attribute("action", "set_chain_setting"))
+        }
+        ExecuteMsg::SetPaloma { chain_id } => {
+            // ACTION: Implement SetPaloma
+            let state = STATE.load(deps.storage)?;
+            assert!(info.sender == state.owner, "Unauthorized");
+
+            #[allow(deprecated)]
+            let contract: Contract = Contract {
+                constructor: None,
+                functions: BTreeMap::from_iter(vec![(
+                    "set_paloma".to_string(),
+                    vec![Function {
+                        name: "set_paloma".to_string(),
+                        inputs: vec![],
+                        outputs: Vec::new(),
+                        constant: None,
+                        state_mutability: StateMutability::NonPayable,
+                    }],
+                )]),
+                events: BTreeMap::new(),
+                errors: BTreeMap::new(),
+                receive: false,
+                fallback: false,
+            };
+            Ok(Response::new()
+                .add_message(CosmosMsg::Custom(PalomaMsg::SchedulerMsg {
+                    execute_job: ExecuteJob {
+                        job_id: CHAIN_SETTINGS
+                            .load(deps.storage, chain_id.clone())?
+                            .main_job_id,
+                        payload: Binary::new(
+                            contract
+                                .function("set_paloma")
+                                .unwrap()
+                                .encode_input(&[])
+                                .unwrap(),
+                        ),
+                    },
+                }))
+                .add_attribute("action", "set_paloma"))
+        }
+        ExecuteMsg::UpdateCompass {
+            chain_id,
+            new_compass,
+        } => {
+            let state = STATE.load(deps.storage)?;
+            assert!(info.sender == state.owner, "Unauthorized");
+
+            #[allow(deprecated)]
+            let contract: Contract = Contract {
+                constructor: None,
+                functions: BTreeMap::from_iter(vec![(
+                    "update_compass".to_string(),
+                    vec![Function {
+                        name: "update_compass".to_string(),
+                        inputs: vec![Param {
+                            name: "new_compass".to_string(),
+                            kind: ParamType::Address,
+                            internal_type: None,
+                        }],
+                        outputs: Vec::new(),
+                        constant: None,
+                        state_mutability: StateMutability::NonPayable,
+                    }],
+                )]),
+                events: BTreeMap::new(),
+                errors: BTreeMap::new(),
+                receive: false,
+                fallback: false,
+            };
+            let tokens = &[Token::Address(
+                Address::from_str(new_compass.as_str()).unwrap(),
+            )];
+            Ok(Response::new()
+                .add_message(CosmosMsg::Custom(PalomaMsg::SchedulerMsg {
+                    execute_job: ExecuteJob {
+                        job_id: CHAIN_SETTINGS
+                            .load(deps.storage, chain_id.clone())?
+                            .main_job_id,
+                        payload: Binary::new(
+                            contract
+                                .function("update_compass")
+                                .unwrap()
+                                .encode_input(tokens)
+                                .unwrap(),
+                        ),
+                    },
+                }))
+                .add_attributes(vec![
+                    ("action", "update_compass"),
+                    ("chain_id", &chain_id),
+                    ("new_compass", new_compass.as_str()),
+                ]))
+        }
+        ExecuteMsg::UpdateRefundWallet {
+            chain_id,
+            new_refund_wallet,
+        } => {
+            let state = STATE.load(deps.storage)?;
+            assert!(state.owner == info.sender, "Unauthorized");
+            let update_refund_wallet_address: Address =
+                Address::from_str(new_refund_wallet.as_str()).unwrap();
+            #[allow(deprecated)]
+            let contract: Contract = Contract {
+                constructor: None,
+                functions: BTreeMap::from_iter(vec![(
+                    "update_refund_wallet".to_string(),
+                    vec![Function {
+                        name: "update_refund_wallet".to_string(),
+                        inputs: vec![Param {
+                            name: "new_refund_wallet".to_string(),
+                            kind: ParamType::Address,
+                            internal_type: None,
+                        }],
+                        outputs: Vec::new(),
+                        constant: None,
+                        state_mutability: StateMutability::NonPayable,
+                    }],
+                )]),
+                events: BTreeMap::new(),
+                errors: BTreeMap::new(),
+                receive: false,
+                fallback: false,
+            };
+            Ok(Response::new()
+                .add_message(CosmosMsg::Custom(PalomaMsg::SchedulerMsg {
+                    execute_job: ExecuteJob {
+                        job_id: CHAIN_SETTINGS
+                            .load(deps.storage, chain_id.clone())?
+                            .main_job_id,
+                        payload: Binary::new(
+                            contract
+                                .function("update_refund_wallet")
+                                .unwrap()
+                                .encode_input(&[Token::Address(update_refund_wallet_address)])
+                                .unwrap(),
+                        ),
+                    },
+                }))
+                .add_attribute("action", "update_refund_wallet"))
+        }
+        ExecuteMsg::UpdateGasFee {
+            chain_id,
+            new_gas_fee,
+        } => {
+            let state = STATE.load(deps.storage)?;
+            assert!(state.owner == info.sender, "Unauthorized");
+            #[allow(deprecated)]
+            let contract: Contract = Contract {
+                constructor: None,
+                functions: BTreeMap::from_iter(vec![(
+                    "update_gas_fee".to_string(),
+                    vec![Function {
+                        name: "update_gas_fee".to_string(),
+                        inputs: vec![Param {
+                            name: "new_gas_fee".to_string(),
+                            kind: ParamType::Uint(256),
+                            internal_type: None,
+                        }],
+                        outputs: Vec::new(),
+                        constant: None,
+                        state_mutability: StateMutability::NonPayable,
+                    }],
+                )]),
+                events: BTreeMap::new(),
+                errors: BTreeMap::new(),
+                receive: false,
+                fallback: false,
+            };
+            Ok(Response::new()
+                .add_message(CosmosMsg::Custom(PalomaMsg::SchedulerMsg {
+                    execute_job: ExecuteJob {
+                        job_id: CHAIN_SETTINGS
+                            .load(deps.storage, chain_id.clone())?
+                            .main_job_id,
+                        payload: Binary::new(
+                            contract
+                                .function("update_gas_fee")
+                                .unwrap()
+                                .encode_input(&[Token::Uint(Uint::from_big_endian(
+                                    &new_gas_fee.to_be_bytes(),
+                                ))])
+                                .unwrap(),
+                        ),
+                    },
+                }))
+                .add_attribute("action", "update_gas_fee"))
+        }
+        ExecuteMsg::UpdateServiceFeeCollector {
+            chain_id,
+            new_service_fee_collector,
+        } => {
+            let state = STATE.load(deps.storage)?;
+            assert!(state.owner == info.sender, "Unauthorized");
+            let update_service_fee_collector_address: Address =
+                Address::from_str(new_service_fee_collector.as_str()).unwrap();
+            #[allow(deprecated)]
+            let contract: Contract = Contract {
+                constructor: None,
+                functions: BTreeMap::from_iter(vec![(
+                    "update_service_fee_collector".to_string(),
+                    vec![Function {
+                        name: "update_service_fee_collector".to_string(),
+                        inputs: vec![Param {
+                            name: "new_service_fee_collector".to_string(),
+                            kind: ParamType::Address,
+                            internal_type: None,
+                        }],
+                        outputs: Vec::new(),
+                        constant: None,
+                        state_mutability: StateMutability::NonPayable,
+                    }],
+                )]),
+                events: BTreeMap::new(),
+                errors: BTreeMap::new(),
+                receive: false,
+                fallback: false,
+            };
+            Ok(Response::new()
+                .add_message(CosmosMsg::Custom(PalomaMsg::SchedulerMsg {
+                    execute_job: ExecuteJob {
+                        job_id: CHAIN_SETTINGS
+                            .load(deps.storage, chain_id.clone())?
+                            .main_job_id,
+                        payload: Binary::new(
+                            contract
+                                .function("update_service_fee_collector")
+                                .unwrap()
+                                .encode_input(&[Token::Address(
+                                    update_service_fee_collector_address,
+                                )])
+                                .unwrap(),
+                        ),
+                    },
+                }))
+                .add_attribute("action", "update_service_fee_collector"))
+        }
+        ExecuteMsg::UpdateServiceFee {
+            chain_id,
+            new_service_fee,
+        } => {
+            let state = STATE.load(deps.storage)?;
+            assert!(state.owner == info.sender, "Unauthorized");
+            #[allow(deprecated)]
+            let contract: Contract = Contract {
+                constructor: None,
+                functions: BTreeMap::from_iter(vec![(
+                    "update_service_fee".to_string(),
+                    vec![Function {
+                        name: "update_service_fee".to_string(),
+                        inputs: vec![Param {
+                            name: "new_service_fee".to_string(),
+                            kind: ParamType::Uint(256),
+                            internal_type: None,
+                        }],
+                        outputs: Vec::new(),
+                        constant: None,
+                        state_mutability: StateMutability::NonPayable,
+                    }],
+                )]),
+                events: BTreeMap::new(),
+                errors: BTreeMap::new(),
+                receive: false,
+                fallback: false,
+            };
+            Ok(Response::new()
+                .add_message(CosmosMsg::Custom(PalomaMsg::SchedulerMsg {
+                    execute_job: ExecuteJob {
+                        job_id: CHAIN_SETTINGS
+                            .load(deps.storage, chain_id.clone())?
+                            .main_job_id,
+                        payload: Binary::new(
+                            contract
+                                .function("update_service_fee")
+                                .unwrap()
+                                .encode_input(&[Token::Uint(Uint::from_big_endian(
+                                    &new_service_fee.to_be_bytes(),
+                                ))])
+                                .unwrap(),
+                        ),
+                    },
+                }))
+                .add_attribute("action", "update_service_fee"))
+        }
+        ExecuteMsg::UpdateConfig { owner, retry_delay } => {
+            let mut state = STATE.load(deps.storage)?;
+            if state.owner != info.sender {
+                return Err(ContractError::Unauthorized {});
+            }
+            if let Some(owner) = owner {
+                state.owner = deps.api.addr_validate(&owner)?;
+            }
+            if let Some(retry_delay) = retry_delay {
+                state.retry_delay = retry_delay;
+            }
+            STATE.save(deps.storage, &state)?;
+            Ok(Response::new().add_attribute("action", "update_config"))
+        }
+    }
+}
+
+#[cfg_attr(not(feature = "library"), entry_point)]
+pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
+    match msg {
+        QueryMsg::GetState {} => to_json_binary(&STATE.load(deps.storage)?),
+        QueryMsg::GetChainSetting { chain_id } => {
+            to_json_binary(&CHAIN_SETTINGS.load(deps.storage, chain_id)?)
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {}
