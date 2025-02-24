@@ -1,7 +1,7 @@
 #[allow(unused_imports)]
 use crate::state::{ChainSetting, State};
 use cosmwasm_schema::{cw_serde, QueryResponses};
-use cosmwasm_std::{Addr, Binary, CustomMsg, Decimal, Uint128, Uint256};
+use cosmwasm_std::{Binary, CustomMsg, Uint128, Uint256};
 
 #[cw_serde]
 pub struct InstantiateMsg {
@@ -11,7 +11,7 @@ pub struct InstantiateMsg {
 
 #[cw_serde]
 pub enum ExecuteMsg {
-    DeployPalomaERC20 {
+    DeployPalomaErc20 {
         chain_id: String,
         paloma_denom: String,
         name: String,
@@ -23,18 +23,6 @@ pub enum ExecuteMsg {
         chain_id: String,
         erc20: String,
         denom: String,
-    },
-    Exchange {
-        dex_router: Addr,
-        operations: Vec<SwapOperation>,
-        minimum_receive: Option<Uint128>,
-        to: Option<String>,
-        max_spread: Option<Decimal>,
-    },
-    SendToEvm {
-        recipient: String,
-        amount: String,
-        chain_reference_id: String,
     },
     SendToken {
         chain_id: String,
@@ -77,35 +65,6 @@ pub enum ExecuteMsg {
 }
 
 #[cw_serde]
-pub enum SwapOperation {
-    AstroSwap {
-        /// Information about the asset being swapped
-        offer_asset_info: AssetInfo,
-        /// Information about the asset we swap to
-        ask_asset_info: AssetInfo,
-    },
-}
-
-#[cw_serde]
-#[derive(Hash, Eq)]
-pub enum AssetInfo {
-    /// Non-native Token
-    Token { contract_addr: Addr },
-    /// Native token
-    NativeToken { denom: String },
-}
-
-#[cw_serde]
-pub enum DexExecuteMsg {
-    ExecuteSwapOperations {
-        operations: Vec<SwapOperation>,
-        minimum_receive: Option<Uint128>,
-        to: Option<String>,
-        max_spread: Option<Decimal>,
-    },
-}
-
-#[cw_serde]
 pub enum PalomaMsg {
     /// Message struct for cross-chain calls.
     SchedulerMsg { execute_job: ExecuteJob },
@@ -113,12 +72,6 @@ pub enum PalomaMsg {
     SetErc20ToDenom {
         erc20_address: String,
         token_denom: String,
-        chain_reference_id: String,
-    },
-    /// Message struct for tokenfactory calls.
-    SendTx {
-        remote_chain_destination_address: String,
-        amount: String,
         chain_reference_id: String,
     },
 }

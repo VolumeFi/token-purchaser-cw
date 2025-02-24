@@ -1,13 +1,9 @@
-[package]
-name = "token-purchaser-cw"
-version = "0.1.0"
-authors = ["Volume Finance"]
-edition = "2021"
-
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
-
-[lib]
-crate-type = ["cdylib", "rlib"]
+[workspace]
+resolver = "2"
+members = [
+    "contracts/collector",
+    "contracts/manager",
+]
 
 [profile.release]
 opt-level = 3
@@ -20,18 +16,7 @@ panic = 'abort'
 incremental = false
 overflow-checks = true
 
-[features]
-# use library feature to disable all instantiate/execute/query exports
-library = []
-
-[package.metadata.scripts]
-optimize = """docker run --rm -v "$(pwd)":/code \
-  --mount type=volume,source="$(basename "$(pwd)")_cache",target=/target \
-  --mount type=volume,source=registry_cache,target=/usr/local/cargo/registry \
-  cosmwasm/optimizer:0.16.1
-"""
-
-[dependencies]
+[workspace.dependencies]
 cosmwasm-schema = "2.2.1"
 cosmwasm-std = "2.2.1"
 cw-storage-plus = "2.0.0"
@@ -41,6 +26,5 @@ getrandom = { version = "0.2.15", features = ["custom"] }
 schemars = "0.8.21"
 serde = { version = "1.0.218", default-features = false, features = ["derive"] }
 thiserror = { version = "1.0.69" }
-
-[dev-dependencies]
 cw-multi-test = "2.3.1"
+

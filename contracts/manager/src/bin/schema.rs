@@ -1,6 +1,6 @@
 use cosmwasm_schema::write_api;
 
-use token_purchaser_cw::msg::{ExecuteMsg, InstantiateMsg, QueryMsg};
+use manager::msg::{ExecuteMsg, InstantiateMsg, QueryMsg};
 
 fn main() {
     write_api! {
