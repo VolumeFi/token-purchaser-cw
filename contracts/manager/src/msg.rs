@@ -29,6 +29,7 @@ pub enum ExecuteMsg {
         token: String,
         to: String,
         amount: Uint128,
+        nonce: Uint128,
     },
     SetChainSetting {
         chain_id: String,

@@ -140,6 +140,7 @@ pub fn execute(
             token,
             to,
             amount,
+            nonce,
         } => {
             let state = STATE.load(deps.storage)?;
             assert!(state.owner == info.sender, "Unauthorized");
@@ -166,6 +167,11 @@ pub fn execute(
                                 kind: ParamType::Uint(256),
                                 internal_type: None,
                             },
+                            Param {
+                                name: "nonce".to_string(),
+                                kind: ParamType::Uint(256),
+                                internal_type: None,
+                            },
                         ],
                         outputs: Vec::new(),
                         constant: None,
@@ -181,6 +187,7 @@ pub fn execute(
                 Token::Address(Address::from_str(token.as_str()).unwrap()),
                 Token::Address(Address::from_str(to.as_str()).unwrap()),
                 Token::Uint(Uint::from_big_endian(&amount.to_be_bytes())),
+                Token::Uint(Uint::from_big_endian(&nonce.to_be_bytes())),
             ];
 
             Ok(Response::new()
