@@ -1,7 +1,7 @@
 #[allow(unused_imports)]
 use crate::state::State;
 use cosmwasm_schema::{cw_serde, QueryResponses};
-use cosmwasm_std::{Addr, CustomMsg, Decimal, Uint128};
+use cosmwasm_std::{Addr, Coin, CustomMsg, Decimal, Uint128};
 
 #[cw_serde]
 pub struct InstantiateMsg {
@@ -16,6 +16,7 @@ pub enum ExecuteMsg {
         minimum_receive: Option<Uint128>,
         to: Option<String>,
         max_spread: Option<Decimal>,
+        funds: Vec<Coin>,
     },
     SendToEvm {
         recipient: String,

@@ -4,12 +4,13 @@ use std::collections::BTreeMap;
 use cosmwasm_std::entry_point;
 use cosmwasm_std::{
     to_json_binary, Binary, CosmosMsg, Deps, DepsMut, Env, MessageInfo, Response, StdResult,
+    WasmMsg,
 };
 use ethabi::{Address, Contract, Function, Param, ParamType, StateMutability, Token, Uint};
 use std::str::FromStr;
 
 use crate::error::ContractError;
-use crate::msg::{ExecuteJob, ExecuteMsg, InstantiateMsg, PalomaMsg, QueryMsg};
+use crate::msg::{DexExecuteMsg, ExecuteJob, ExecuteMsg, InstantiateMsg, PalomaMsg, QueryMsg};
 use crate::state::{ChainSetting, State, CHAIN_SETTINGS, STATE};
 
 /*
@@ -119,6 +120,29 @@ pub fn execute(
                     },
                 }))
                 .add_attribute("action", "deploy_paloma_erc20"))
+        }
+        ExecuteMsg::Exchange {
+            dex_router,
+            operations,
+            minimum_receive,
+            to,
+            max_spread,
+            funds,
+        } => {
+            let state = STATE.load(deps.storage)?;
+            assert!(state.owner == info.sender, "Unauthorized");
+            Ok(Response::new()
+                .add_message(CosmosMsg::Wasm(WasmMsg::Execute {
+                    contract_addr: dex_router.to_string(),
+                    msg: to_json_binary(&DexExecuteMsg::ExecuteSwapOperations {
+                        operations,
+                        minimum_receive,
+                        to,
+                        max_spread,
+                    })?,
+                    funds,
+                }))
+                .add_attribute("action", "exchange"))
         }
         ExecuteMsg::SetBridge {
             chain_id,
