@@ -43,6 +43,7 @@ pub fn execute(
             minimum_receive,
             to,
             max_spread,
+            funds,
         } => {
             let state = STATE.load(deps.storage)?;
             assert!(state.owner == info.sender, "Unauthorized");
@@ -55,7 +56,7 @@ pub fn execute(
                         to,
                         max_spread,
                     })?,
-                    funds: info.funds,
+                    funds,
                 }))
                 .add_attribute("action", "exchange"))
         }
