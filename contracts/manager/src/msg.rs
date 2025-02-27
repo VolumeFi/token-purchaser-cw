@@ -107,17 +107,20 @@ pub enum PalomaMsg {
     /// Message struct for cross-chain calls.
     SchedulerMsg { execute_job: ExecuteJob },
     /// Message struct for tokenfactory calls.
-    SetErc20ToDenom {
-        erc20_address: String,
-        token_denom: String,
-        chain_reference_id: String,
-    },
+    SkywayMsg { set_erc20_to_denom: SetErc20ToDenom },
 }
 
 #[cw_serde]
 pub struct ExecuteJob {
     pub job_id: String,
     pub payload: Binary,
+}
+
+#[cw_serde]
+pub struct SetErc20ToDenom {
+    pub erc20_address: String,
+    pub token_denom: String,
+    pub chain_reference_id: String,
 }
 
 #[cw_serde]
