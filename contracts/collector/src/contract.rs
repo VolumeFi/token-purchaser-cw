@@ -6,7 +6,7 @@ use cosmwasm_std::{
 };
 
 use crate::error::ContractError;
-use crate::msg::{DexExecuteMsg, ExecuteMsg, InstantiateMsg, PalomaMsg, QueryMsg};
+use crate::msg::{DexExecuteMsg, ExecuteMsg, InstantiateMsg, PalomaMsg, QueryMsg, SendTx};
 use crate::state::{State, STATE};
 
 /*
@@ -68,10 +68,12 @@ pub fn execute(
             let state = STATE.load(deps.storage)?;
             assert!(state.owner == info.sender, "Unauthorized");
             Ok(Response::new()
-                .add_message(CosmosMsg::Custom(PalomaMsg::SendTx {
-                    remote_chain_destination_address: recipient,
-                    amount,
-                    chain_reference_id,
+                .add_message(CosmosMsg::Custom(PalomaMsg::SkywayMsg {
+                    send_tx: SendTx {
+                        remote_chain_destination_address: recipient,
+                        amount,
+                        chain_reference_id,
+                    },
                 }))
                 .add_attribute("action", "send_to_evm"))
         }

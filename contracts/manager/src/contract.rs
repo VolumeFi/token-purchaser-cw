@@ -10,7 +10,9 @@ use ethabi::{Address, Contract, Function, Param, ParamType, StateMutability, Tok
 use std::str::FromStr;
 
 use crate::error::ContractError;
-use crate::msg::{DexExecuteMsg, ExecuteJob, ExecuteMsg, InstantiateMsg, PalomaMsg, QueryMsg};
+use crate::msg::{
+    DexExecuteMsg, ExecuteJob, ExecuteMsg, InstantiateMsg, PalomaMsg, QueryMsg, SetErc20ToDenom,
+};
 use crate::state::{ChainSetting, State, CHAIN_SETTINGS, STATE};
 
 /*
@@ -152,10 +154,12 @@ pub fn execute(
             let state = STATE.load(deps.storage)?;
             assert!(state.owner == info.sender, "Unauthorized");
             Ok(Response::new()
-                .add_message(CosmosMsg::Custom(PalomaMsg::SetErc20ToDenom {
-                    erc20_address: erc20,
-                    token_denom: denom,
-                    chain_reference_id: chain_id,
+                .add_message(CosmosMsg::Custom(PalomaMsg::SkywayMsg {
+                    set_erc20_to_denom: SetErc20ToDenom {
+                        erc20_address: erc20,
+                        token_denom: denom,
+                        chain_reference_id: chain_id,
+                    },
                 }))
                 .add_attribute("action", "set_bridge"))
         }

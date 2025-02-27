@@ -60,11 +60,14 @@ pub enum DexExecuteMsg {
 #[cw_serde]
 pub enum PalomaMsg {
     /// Message struct for tokenfactory calls.
-    SendTx {
-        remote_chain_destination_address: String,
-        amount: String,
-        chain_reference_id: String,
-    },
+    SkywayMsg { send_tx: SendTx },
+}
+
+#[cw_serde]
+pub struct SendTx {
+    pub remote_chain_destination_address: String,
+    pub amount: String,
+    pub chain_reference_id: String,
 }
 
 #[cw_serde]
