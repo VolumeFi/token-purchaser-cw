@@ -1,2 +1,2 @@
 75cbc8acfd2bd08cbc48d75b95936388042bc8055f34fef9a79b2bc4b0eac5b1  collector.wasm
-3d71ca7ce2c661b92ce042cb0d1300ba15f51ed76fde495dd21f7a36fd0ac26b  manager.wasm
+c07f7533f5d826717a5b0c109844de1ac8d443cc8cdbc0e030b13aa56302f4d2  manager.wasm

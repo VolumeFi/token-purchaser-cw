@@ -27,11 +27,6 @@ pub enum ExecuteMsg {
         max_spread: Option<Decimal>,
         funds: Vec<Coin>,
     },
-    SetBridge {
-        chain_id: String,
-        erc20: String,
-        denom: String,
-    },
     SendToken {
         chain_id: String,
         token: String,
@@ -106,21 +101,12 @@ pub enum DexExecuteMsg {
 pub enum PalomaMsg {
     /// Message struct for cross-chain calls.
     SchedulerMsg { execute_job: ExecuteJob },
-    /// Message struct for tokenfactory calls.
-    SkywayMsg { set_erc20_to_denom: SetErc20ToDenom },
 }
 
 #[cw_serde]
 pub struct ExecuteJob {
     pub job_id: String,
     pub payload: Binary,
-}
-
-#[cw_serde]
-pub struct SetErc20ToDenom {
-    pub erc20_address: String,
-    pub token_denom: String,
-    pub chain_reference_id: String,
 }
 
 #[cw_serde]
