@@ -3,14 +3,14 @@ use std::collections::BTreeMap;
 #[cfg(not(feature = "library"))]
 use cosmwasm_std::entry_point;
 use cosmwasm_std::{
-    to_json_binary, Binary, CosmosMsg, Deps, DepsMut, Env, MessageInfo, Response, StdResult,
+    to_json_binary, Binary, Coin, CosmosMsg, Deps, DepsMut, Env, MessageInfo, Response, StdResult,
     WasmMsg,
 };
 use ethabi::{Address, Contract, Function, Param, ParamType, StateMutability, Token, Uint};
 use std::str::FromStr;
 
 use crate::error::ContractError;
-use crate::msg::{DexExecuteMsg, ExecuteJob, ExecuteMsg, InstantiateMsg, PalomaMsg, QueryMsg};
+use crate::msg::{ExecuteJob, ExecuteMsg, ExternalExecuteMsg, InstantiateMsg, PalomaMsg, QueryMsg};
 use crate::state::{ChainSetting, State, CHAIN_SETTINGS, STATE};
 
 /*
@@ -134,7 +134,7 @@ pub fn execute(
             Ok(Response::new()
                 .add_message(CosmosMsg::Wasm(WasmMsg::Execute {
                     contract_addr: dex_router.to_string(),
-                    msg: to_json_binary(&DexExecuteMsg::ExecuteSwapOperations {
+                    msg: to_json_binary(&ExternalExecuteMsg::ExecuteSwapOperations {
                         operations,
                         minimum_receive,
                         to,
@@ -215,6 +215,59 @@ pub fn execute(
                     },
                 }))
                 .add_attribute("action", "send_token"))
+        }
+        ExecuteMsg::WithdrawPusd {
+            pusd_manager,
+            chain_id,
+            recipient,
+            amount,
+        } => {
+            let state = STATE.load(deps.storage)?;
+            assert!(state.owner == info.sender, "Unauthorized");
+            let pusd_denom: String = "factory/".to_string() + pusd_manager.as_str() + "/pusd";
+            Ok(Response::new()
+                .add_message(CosmosMsg::Wasm(WasmMsg::Execute {
+                    contract_addr: pusd_manager.to_string(),
+                    msg: to_json_binary(&ExternalExecuteMsg::Withdraw {
+                        chain_id,
+                        recipient,
+                    })?,
+                    funds: vec![Coin {
+                        denom: pusd_denom,
+                        amount,
+                    }],
+                }))
+                .add_attribute("action", "withdraw_pusd"))
+        }
+
+        ExecuteMsg::ReWithdrawPusd {
+            pusd_manager,
+            nonce,
+        } => {
+            let state = STATE.load(deps.storage)?;
+            assert!(state.owner == info.sender, "Unauthorized");
+            Ok(Response::new()
+                .add_message(CosmosMsg::Wasm(WasmMsg::Execute {
+                    contract_addr: pusd_manager.to_string(),
+                    msg: to_json_binary(&ExternalExecuteMsg::ReWithdraw { nonce })?,
+                    funds: vec![],
+                }))
+                .add_attribute("action", "re_withdraw_pusd"))
+        }
+
+        ExecuteMsg::CancelWithdrawPusd {
+            pusd_manager,
+            nonce,
+        } => {
+            let state = STATE.load(deps.storage)?;
+            assert!(state.owner == info.sender, "Unauthorized");
+            Ok(Response::new()
+                .add_message(CosmosMsg::Wasm(WasmMsg::Execute {
+                    contract_addr: pusd_manager.to_string(),
+                    msg: to_json_binary(&ExternalExecuteMsg::CancelWithdraw { nonce })?,
+                    funds: vec![],
+                }))
+                .add_attribute("action", "cancel_withdraw_pusd"))
         }
         ExecuteMsg::SetChainSetting {
             chain_id,
