@@ -34,6 +34,28 @@ pub enum ExecuteMsg {
         amount: Uint128,
         nonce: Uint128,
     },
+    WithdrawPusd {
+        /// The address of the pusd_manager CW contract
+        pusd_manager: Addr,
+        /// The chain id of the chain to withdraw from
+        chain_id: String,
+        /// The EVM address to send the funds to
+        recipient: String,
+        /// The PUSD amount to withdraw
+        amount: Uint128,
+    },
+    ReWithdrawPusd {
+        /// The address of the pusd_manager CW contract
+        pusd_manager: Addr,
+        /// The nonce of the withdrawal to re-withdraw
+        nonce: u64,
+    },
+    CancelWithdrawPusd {
+        /// The address of the pusd_manager CW contract
+        pusd_manager: Addr,
+        /// The nonce of the withdrawal to cancel
+        nonce: u64,
+    },
     SetChainSetting {
         chain_id: String,
         compass_job_id: String,
@@ -88,12 +110,24 @@ pub enum AssetInfo {
 }
 
 #[cw_serde]
-pub enum DexExecuteMsg {
+pub enum ExternalExecuteMsg {
     ExecuteSwapOperations {
         operations: Vec<SwapOperation>,
         minimum_receive: Option<Uint128>,
         to: Option<String>,
         max_spread: Option<Decimal>,
+    },
+    Withdraw {
+        chain_id: String,
+        recipient: String,
+    },
+    // ReWithdraw PUSD by nonce
+    ReWithdraw {
+        nonce: u64,
+    },
+    // Cancel Withdraw by nonce
+    CancelWithdraw {
+        nonce: u64,
     },
 }
 
