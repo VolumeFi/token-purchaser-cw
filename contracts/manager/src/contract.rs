@@ -224,7 +224,7 @@ pub fn execute(
         } => {
             let state = STATE.load(deps.storage)?;
             assert!(state.owner == info.sender, "Unauthorized");
-            let pusd_denom: String = "factory/".to_string() + pusd_manager.as_str() + "/pusd";
+            let pusd_denom: String = "factory/".to_string() + pusd_manager.as_str() + "/upusd";
             Ok(Response::new()
                 .add_message(CosmosMsg::Wasm(WasmMsg::Execute {
                     contract_addr: pusd_manager.to_string(),
