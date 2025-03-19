@@ -23,7 +23,11 @@ pub fn instantiate(
     msg: InstantiateMsg,
 ) -> Result<Response, ContractError> {
     let state = State {
-        owner: deps.api.addr_validate(&msg.owner)?,
+        owners: msg
+            .owners
+            .iter()
+            .map(|x| deps.api.addr_validate(x).unwrap())
+            .collect(),
     };
     STATE.save(deps.storage, &state)?;
     Ok(Response::new().add_attribute("action", "instantiate"))
@@ -46,7 +50,10 @@ pub fn execute(
             funds,
         } => {
             let state = STATE.load(deps.storage)?;
-            assert!(state.owner == info.sender, "Unauthorized");
+            assert!(
+                state.owners.iter().any(|x| x == info.sender),
+                "Unauthorized"
+            );
             Ok(Response::new()
                 .add_message(CosmosMsg::Wasm(WasmMsg::Execute {
                     contract_addr: dex_router.to_string(),
@@ -67,7 +74,10 @@ pub fn execute(
             amount,
         } => {
             let state = STATE.load(deps.storage)?;
-            assert!(state.owner == info.sender, "Unauthorized");
+            assert!(
+                state.owners.iter().any(|x| x == info.sender),
+                "Unauthorized"
+            );
             let pusd_denom: String = "factory/".to_string() + pusd_manager.as_str() + "/upusd";
             Ok(Response::new()
                 .add_message(CosmosMsg::Wasm(WasmMsg::Execute {
@@ -89,7 +99,10 @@ pub fn execute(
             nonce,
         } => {
             let state = STATE.load(deps.storage)?;
-            assert!(state.owner == info.sender, "Unauthorized");
+            assert!(
+                state.owners.iter().any(|x| x == info.sender),
+                "Unauthorized"
+            );
             Ok(Response::new()
                 .add_message(CosmosMsg::Wasm(WasmMsg::Execute {
                     contract_addr: pusd_manager.to_string(),
@@ -104,7 +117,10 @@ pub fn execute(
             nonce,
         } => {
             let state = STATE.load(deps.storage)?;
-            assert!(state.owner == info.sender, "Unauthorized");
+            assert!(
+                state.owners.iter().any(|x| x == info.sender),
+                "Unauthorized"
+            );
             Ok(Response::new()
                 .add_message(CosmosMsg::Wasm(WasmMsg::Execute {
                     contract_addr: pusd_manager.to_string(),
@@ -120,7 +136,10 @@ pub fn execute(
             chain_reference_id,
         } => {
             let state = STATE.load(deps.storage)?;
-            assert!(state.owner == info.sender, "Unauthorized");
+            assert!(
+                state.owners.iter().any(|x| x == info.sender),
+                "Unauthorized"
+            );
             Ok(Response::new()
                 .add_message(CosmosMsg::Custom(PalomaMsg::SkywayMsg {
                     send_tx: SendTx {
@@ -131,14 +150,33 @@ pub fn execute(
                 }))
                 .add_attribute("action", "send_to_evm"))
         }
-        ExecuteMsg::UpdateConfig { owner } => {
+        ExecuteMsg::AddOwner { owner } => {
             let mut state = STATE.load(deps.storage)?;
-            if state.owner != info.sender {
-                return Err(ContractError::Unauthorized {});
-            }
-            if let Some(owner) = owner {
-                state.owner = deps.api.addr_validate(&owner)?;
-            }
+            assert!(
+                state.owners.iter().any(|x| x == info.sender),
+                "Unauthorized"
+            );
+            let owner = deps.api.addr_validate(&owner)?;
+            assert!(
+                !state.owners.iter().any(|x| x == info.sender),
+                "Owner already exists"
+            );
+            state.owners.push(owner);
+            STATE.save(deps.storage, &state)?;
+            Ok(Response::new().add_attribute("action", "update_config"))
+        }
+        ExecuteMsg::RemoveOwner { owner } => {
+            let mut state = STATE.load(deps.storage)?;
+            assert!(
+                state.owners.iter().any(|x| x == info.sender),
+                "Unauthorized"
+            );
+            let owner = deps.api.addr_validate(&owner)?;
+            assert!(
+                state.owners.iter().any(|x| x == owner),
+                "Owner does not exist"
+            );
+            state.owners.retain(|x| x != owner);
             STATE.save(deps.storage, &state)?;
             Ok(Response::new().add_attribute("action", "update_config"))
         }

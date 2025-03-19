@@ -6,7 +6,7 @@ use cosmwasm_std::{Addr, Binary, Coin, CustomMsg, Decimal, Uint128, Uint256};
 #[cw_serde]
 pub struct InstantiateMsg {
     pub retry_delay: u64,
-    pub owner: String,
+    pub owners: Vec<String>,
 }
 
 #[cw_serde]
@@ -85,8 +85,13 @@ pub enum ExecuteMsg {
         new_service_fee: Uint256,
     },
     UpdateConfig {
-        owner: Option<String>,
         retry_delay: Option<u64>,
+    },
+    AddOwner {
+        owner: String,
+    },
+    RemoveOwner {
+        owner: String,
     },
 }
 

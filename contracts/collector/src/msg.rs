@@ -5,7 +5,7 @@ use cosmwasm_std::{Addr, Coin, CustomMsg, Decimal, Uint128};
 
 #[cw_serde]
 pub struct InstantiateMsg {
-    pub owner: String,
+    pub owners: Vec<String>,
 }
 
 #[cw_serde]
@@ -45,8 +45,11 @@ pub enum ExecuteMsg {
         /// The nonce of the withdrawal to cancel
         nonce: u64,
     },
-    UpdateConfig {
-        owner: Option<String>,
+    AddOwner {
+        owner: String,
+    },
+    RemoveOwner {
+        owner: String,
     },
 }
 

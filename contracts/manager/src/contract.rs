@@ -27,7 +27,11 @@ pub fn instantiate(
     msg: InstantiateMsg,
 ) -> Result<Response, ContractError> {
     let state = State {
-        owner: deps.api.addr_validate(&msg.owner)?,
+        owners: msg
+            .owners
+            .iter()
+            .map(|x| deps.api.addr_validate(x).unwrap())
+            .collect(),
         retry_delay: msg.retry_delay,
     };
     STATE.save(deps.storage, &state)?;
@@ -51,7 +55,10 @@ pub fn execute(
             blueprint,
         } => {
             let state = STATE.load(deps.storage)?;
-            assert!(state.owner == info.sender, "Unauthorized");
+            assert!(
+                state.owners.iter().any(|x| x == info.sender),
+                "Unauthorized"
+            );
             #[allow(deprecated)]
             let contract: Contract = Contract {
                 constructor: None,
@@ -130,7 +137,10 @@ pub fn execute(
             funds,
         } => {
             let state = STATE.load(deps.storage)?;
-            assert!(state.owner == info.sender, "Unauthorized");
+            assert!(
+                state.owners.iter().any(|x| x == info.sender),
+                "Unauthorized"
+            );
             Ok(Response::new()
                 .add_message(CosmosMsg::Wasm(WasmMsg::Execute {
                     contract_addr: dex_router.to_string(),
@@ -152,7 +162,10 @@ pub fn execute(
             nonce,
         } => {
             let state = STATE.load(deps.storage)?;
-            assert!(state.owner == info.sender, "Unauthorized");
+            assert!(
+                state.owners.iter().any(|x| x == info.sender),
+                "Unauthorized"
+            );
             #[allow(deprecated)]
             let contract: Contract = Contract {
                 constructor: None,
@@ -223,7 +236,10 @@ pub fn execute(
             amount,
         } => {
             let state = STATE.load(deps.storage)?;
-            assert!(state.owner == info.sender, "Unauthorized");
+            assert!(
+                state.owners.iter().any(|x| x == info.sender),
+                "Unauthorized"
+            );
             let pusd_denom: String = "factory/".to_string() + pusd_manager.as_str() + "/upusd";
             Ok(Response::new()
                 .add_message(CosmosMsg::Wasm(WasmMsg::Execute {
@@ -245,7 +261,10 @@ pub fn execute(
             nonce,
         } => {
             let state = STATE.load(deps.storage)?;
-            assert!(state.owner == info.sender, "Unauthorized");
+            assert!(
+                state.owners.iter().any(|x| x == info.sender),
+                "Unauthorized"
+            );
             Ok(Response::new()
                 .add_message(CosmosMsg::Wasm(WasmMsg::Execute {
                     contract_addr: pusd_manager.to_string(),
@@ -260,7 +279,10 @@ pub fn execute(
             nonce,
         } => {
             let state = STATE.load(deps.storage)?;
-            assert!(state.owner == info.sender, "Unauthorized");
+            assert!(
+                state.owners.iter().any(|x| x == info.sender),
+                "Unauthorized"
+            );
             Ok(Response::new()
                 .add_message(CosmosMsg::Wasm(WasmMsg::Execute {
                     contract_addr: pusd_manager.to_string(),
@@ -275,7 +297,10 @@ pub fn execute(
             main_job_id,
         } => {
             let state = STATE.load(deps.storage)?;
-            assert!(state.owner == info.sender, "Unauthorized");
+            assert!(
+                state.owners.iter().any(|x| x == info.sender),
+                "Unauthorized"
+            );
             CHAIN_SETTINGS.save(
                 deps.storage,
                 chain_id.clone(),
@@ -290,7 +315,10 @@ pub fn execute(
         ExecuteMsg::SetPaloma { chain_id } => {
             // ACTION: Implement SetPaloma
             let state = STATE.load(deps.storage)?;
-            assert!(info.sender == state.owner, "Unauthorized");
+            assert!(
+                state.owners.iter().any(|x| x == info.sender),
+                "Unauthorized"
+            );
 
             #[allow(deprecated)]
             let contract: Contract = Contract {
@@ -332,7 +360,10 @@ pub fn execute(
             new_compass,
         } => {
             let state = STATE.load(deps.storage)?;
-            assert!(info.sender == state.owner, "Unauthorized");
+            assert!(
+                state.owners.iter().any(|x| x == info.sender),
+                "Unauthorized"
+            );
 
             #[allow(deprecated)]
             let contract: Contract = Contract {
@@ -385,7 +416,10 @@ pub fn execute(
             new_refund_wallet,
         } => {
             let state = STATE.load(deps.storage)?;
-            assert!(state.owner == info.sender, "Unauthorized");
+            assert!(
+                state.owners.iter().any(|x| x == info.sender),
+                "Unauthorized"
+            );
             let update_refund_wallet_address: Address =
                 Address::from_str(new_refund_wallet.as_str()).unwrap();
             #[allow(deprecated)]
@@ -432,7 +466,10 @@ pub fn execute(
             new_gas_fee,
         } => {
             let state = STATE.load(deps.storage)?;
-            assert!(state.owner == info.sender, "Unauthorized");
+            assert!(
+                state.owners.iter().any(|x| x == info.sender),
+                "Unauthorized"
+            );
             #[allow(deprecated)]
             let contract: Contract = Contract {
                 constructor: None,
@@ -479,7 +516,10 @@ pub fn execute(
             new_service_fee_collector,
         } => {
             let state = STATE.load(deps.storage)?;
-            assert!(state.owner == info.sender, "Unauthorized");
+            assert!(
+                state.owners.iter().any(|x| x == info.sender),
+                "Unauthorized"
+            );
             let update_service_fee_collector_address: Address =
                 Address::from_str(new_service_fee_collector.as_str()).unwrap();
             #[allow(deprecated)]
@@ -528,7 +568,10 @@ pub fn execute(
             new_service_fee,
         } => {
             let state = STATE.load(deps.storage)?;
-            assert!(state.owner == info.sender, "Unauthorized");
+            assert!(
+                state.owners.iter().any(|x| x == info.sender),
+                "Unauthorized"
+            );
             #[allow(deprecated)]
             let contract: Contract = Contract {
                 constructor: None,
@@ -570,17 +613,45 @@ pub fn execute(
                 }))
                 .add_attribute("action", "update_service_fee"))
         }
-        ExecuteMsg::UpdateConfig { owner, retry_delay } => {
+        ExecuteMsg::UpdateConfig { retry_delay } => {
             let mut state = STATE.load(deps.storage)?;
-            if state.owner != info.sender {
-                return Err(ContractError::Unauthorized {});
-            }
-            if let Some(owner) = owner {
-                state.owner = deps.api.addr_validate(&owner)?;
-            }
+            assert!(
+                state.owners.iter().any(|x| x == info.sender),
+                "Unauthorized"
+            );
             if let Some(retry_delay) = retry_delay {
                 state.retry_delay = retry_delay;
             }
+            STATE.save(deps.storage, &state)?;
+            Ok(Response::new().add_attribute("action", "update_config"))
+        }
+        ExecuteMsg::AddOwner { owner } => {
+            let mut state = STATE.load(deps.storage)?;
+            assert!(
+                state.owners.iter().any(|x| x == info.sender),
+                "Unauthorized"
+            );
+            let owner = deps.api.addr_validate(&owner)?;
+            assert!(
+                !state.owners.iter().any(|x| x == info.sender),
+                "Owner already exists"
+            );
+            state.owners.push(owner);
+            STATE.save(deps.storage, &state)?;
+            Ok(Response::new().add_attribute("action", "update_config"))
+        }
+        ExecuteMsg::RemoveOwner { owner } => {
+            let mut state = STATE.load(deps.storage)?;
+            assert!(
+                state.owners.iter().any(|x| x == info.sender),
+                "Unauthorized"
+            );
+            let owner = deps.api.addr_validate(&owner)?;
+            assert!(
+                state.owners.iter().any(|x| x == owner),
+                "Owner does not exist"
+            );
+            state.owners.retain(|x| x != owner);
             STATE.save(deps.storage, &state)?;
             Ok(Response::new().add_attribute("action", "update_config"))
         }
