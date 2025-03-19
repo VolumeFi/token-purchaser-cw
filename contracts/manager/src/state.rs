@@ -6,7 +6,7 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, JsonSchema)]
 pub struct State {
-    pub owner: Addr,
+    pub owners: Vec<Addr>,
     pub retry_delay: u64,
 }
 
