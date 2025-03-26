@@ -9,6 +9,9 @@ pub struct InstantiateMsg {
 }
 
 #[cw_serde]
+pub struct MigrateMsg {}
+
+#[cw_serde]
 pub enum ExecuteMsg {
     Exchange {
         dex_router: Addr,
@@ -22,6 +25,9 @@ pub enum ExecuteMsg {
         recipient: String,
         amount: String,
         chain_reference_id: String,
+    },
+    CancelTx {
+        transaction_id: u64,
     },
     WithdrawPusd {
         /// The address of the pusd_manager CW contract
@@ -97,7 +103,10 @@ pub enum ExternalExecuteMsg {
 #[cw_serde]
 pub enum PalomaMsg {
     /// Message struct for tokenfactory calls.
-    SkywayMsg { send_tx: SendTx },
+    SkywayMsg {
+        send_tx: Option<SendTx>,
+        cancel_tx: Option<CancelTx>,
+    },
 }
 
 #[cw_serde]
@@ -105,6 +114,11 @@ pub struct SendTx {
     pub remote_chain_destination_address: String,
     pub amount: String,
     pub chain_reference_id: String,
+}
+
+#[cw_serde]
+pub struct CancelTx {
+    pub transaction_id: u64,
 }
 
 #[cw_serde]
