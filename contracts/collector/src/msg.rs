@@ -52,7 +52,7 @@ pub enum ExecuteMsg {
         nonce: u64,
     },
     AddOwner {
-        owner: String,
+        owners: Vec<String>,
     },
     RemoveOwner {
         owner: String,

@@ -6,18 +6,25 @@ use cosmwasm_std::{
     to_json_binary, Binary, Coin, CosmosMsg, Deps, DepsMut, Env, MessageInfo, Response, StdResult,
     WasmMsg,
 };
+use cw2::set_contract_version;
 use ethabi::{Address, Contract, Function, Param, ParamType, StateMutability, Token, Uint};
 use std::str::FromStr;
 
 use crate::error::ContractError;
-use crate::msg::{ExecuteJob, ExecuteMsg, ExternalExecuteMsg, InstantiateMsg, PalomaMsg, QueryMsg};
+use crate::msg::{
+    ExecuteJob, ExecuteMsg, ExternalExecuteMsg, InstantiateMsg, MigrateMsg, PalomaMsg, QueryMsg,
+};
 use crate::state::{ChainSetting, State, CHAIN_SETTINGS, STATE};
 
-/*
 // version info for migration info
-const CONTRACT_NAME: &str = "crates.io:token-purchaser-cw";
+const CONTRACT_NAME: &str = "crates.io:token-purchaser-manager-cw";
 const CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");
-*/
+
+#[cfg_attr(not(feature = "library"), entry_point)]
+pub fn migrate(deps: DepsMut, _env: Env, _msg: MigrateMsg) -> StdResult<Response> {
+    set_contract_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
+    Ok(Response::default())
+}
 
 #[cfg_attr(not(feature = "library"), entry_point)]
 pub fn instantiate(
@@ -625,18 +632,18 @@ pub fn execute(
             STATE.save(deps.storage, &state)?;
             Ok(Response::new().add_attribute("action", "update_config"))
         }
-        ExecuteMsg::AddOwner { owner } => {
+        ExecuteMsg::AddOwner { owners } => {
             let mut state = STATE.load(deps.storage)?;
             assert!(
                 state.owners.iter().any(|x| x == info.sender),
                 "Unauthorized"
             );
-            let owner = deps.api.addr_validate(&owner)?;
-            assert!(
-                !state.owners.iter().any(|x| x == info.sender),
-                "Owner already exists"
-            );
-            state.owners.push(owner);
+            for owner in owners.iter() {
+                let owner = deps.api.addr_validate(owner)?;
+                if !state.owners.iter().any(|x| x == owner) {
+                    state.owners.push(owner);
+                }
+            }
             STATE.save(deps.storage, &state)?;
             Ok(Response::new().add_attribute("action", "update_config"))
         }

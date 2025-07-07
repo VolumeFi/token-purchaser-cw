@@ -88,12 +88,15 @@ pub enum ExecuteMsg {
         retry_delay: Option<u64>,
     },
     AddOwner {
-        owner: String,
+        owners: Vec<String>,
     },
     RemoveOwner {
         owner: String,
     },
 }
+
+#[cw_serde]
+pub struct MigrateMsg {}
 
 #[cw_serde]
 pub enum SwapOperation {

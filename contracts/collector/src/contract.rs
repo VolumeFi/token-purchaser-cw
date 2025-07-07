@@ -14,7 +14,7 @@ use crate::msg::{
 use crate::state::{State, STATE};
 
 // version info for migration info
-const CONTRACT_NAME: &str = "crates.io:token-purchaser-cw";
+const CONTRACT_NAME: &str = "crates.io:token-purchaser-collector-cw";
 const CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");
 
 #[cfg_attr(not(feature = "library"), entry_point)]
@@ -175,18 +175,18 @@ pub fn execute(
                 .add_attribute("action", "cancel_tx"))
         }
 
-        ExecuteMsg::AddOwner { owner } => {
+        ExecuteMsg::AddOwner { owners } => {
             let mut state = STATE.load(deps.storage)?;
             assert!(
                 state.owners.iter().any(|x| x == info.sender),
                 "Unauthorized"
             );
-            let owner = deps.api.addr_validate(&owner)?;
-            assert!(
-                !state.owners.iter().any(|x| x == info.sender),
-                "Owner already exists"
-            );
-            state.owners.push(owner);
+            for owner in owners.iter() {
+                let owner = deps.api.addr_validate(owner)?;
+                if !state.owners.iter().any(|x| x == owner) {
+                    state.owners.push(owner);
+                }
+            }
             STATE.save(deps.storage, &state)?;
             Ok(Response::new().add_attribute("action", "update_config"))
         }
